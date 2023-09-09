@@ -1,0 +1,39 @@
+--- buildroot-2023.02.3/Makefile	2023-07-17 21:07:52.000000000 +0000
++++ buildroot-2023.02.3/Makefile	2023-09-09 08:25:43.711956349 +0000
+@@ -34,7 +34,7 @@
+ # or avoid confusing packages that can use the O=<dir> syntax for out-of-tree
+ # build by preventing it from being forwarded to sub-make calls.
+ ifneq ("$(origin O)", "command line")
+-O := $(CURDIR)/output
++O := $(CURDIR)/../output
+ endif
+ 
+ # Check if the current Buildroot execution meets all the pre-requisites.
+@@ -1016,7 +1016,7 @@
+ 		$(firstword \
+ 			$(foreach d, \
+ 				$(call reverse,$(TOPDIR) $(BR2_EXTERNAL_DIRS)), \
+-				$(wildcard $(d)/configs/$@) \
++				$(wildcard $(d)/configs/$@ $(d)/configs/buildroot/$@) \
+ 			) \
+ 		), \
+ 		$(error "Can't find $@") \
+@@ -1110,7 +1110,7 @@
+ 
+ .PHONY: distclean
+ distclean: clean
+-ifeq ($(O),$(CURDIR)/output)
++ifeq ($(realpath $(O)),$(realpath $(CURDIR)/../output))
+ 	rm -rf $(O)
+ endif
+ 	rm -rf $(TOPDIR)/dl $(BR2_CONFIG) $(CONFIG_DIR)/.config.old $(CONFIG_DIR)/..config.tmp \
+@@ -1149,6 +1149,9 @@
+ 	@echo
+ 	@echo 'Package-specific:'
+ 	@echo '  <pkg>                  - Build and install <pkg> and all its dependencies'
++	@echo '  <pkg>-auto             - Build and install and pack <pkg> and all its dependencies'
++	@echo '  <pkg>-pack-module      - install module'
++	@echo '  <pkg>-pack-clean      	- clean module'
+ 	@echo '  <pkg>-source           - Only download the source files for <pkg>'
+ 	@echo '  <pkg>-extract          - Extract <pkg> sources'
+ 	@echo '  <pkg>-patch            - Apply patches to <pkg>'

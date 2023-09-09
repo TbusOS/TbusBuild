@@ -1,0 +1,11 @@
+menu "platform"
+    config EXTERNEL_LINUX_DIR
+        string "externel linux kernel dir"
+
+    source "$BR2_EXTERNAL_TBUS_BUILD_PATH/platform/app/package/Config.in"
+    source "$BR2_EXTERNAL_TBUS_BUILD_PATH/platform/driver/package/Config.in"
+    source "$BR2_EXTERNAL_TBUS_BUILD_PATH/platform/tools/package/Config.in"
+
+    source "$BR2_EXTERNAL_TBUS_BUILD_PATH/platform/driver/package/hello_world/Config.in"
+    source "$BR2_EXTERNAL_TBUS_BUILD_PATH/platform/app/package/demo/Config.in"
+endmenu

@@ -1,0 +1,3 @@
+config BR2_SELECT_ALL_TOOLS
+    bool "select all tools"
+    default n

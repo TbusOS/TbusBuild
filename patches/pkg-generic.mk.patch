@@ -1,0 +1,182 @@
+--- buildroot-2023.02.3/package/pkg-generic.mk	2023-07-17 21:07:52.000000000 +0000
++++ buildroot-2023.02.3/package/pkg-generic.mk	2023-09-09 08:26:03.127069785 +0000
+@@ -398,6 +398,9 @@
+ 
+ # Final installation step, completed when all installation steps
+ # (host, images, staging, target) have completed
++$(BUILD_DIR)/%/.stamp_auto:
++	@$(call MESSAGE,"AUTO END")
++
+ $(BUILD_DIR)/%/.stamp_installed:
+ 	@$(call pkg_size_after,$(TARGET_DIR))
+ 	@$(call pkg_size_after,$(STAGING_DIR),-staging)
+@@ -406,11 +409,24 @@
+ 	@$(call check_bin_arch)
+ 	$(Q)touch $@
+ 
++$(BUILD_DIR)/%/.stamp_pack_clean:
++	rm -rf $(TOPDIR)/../output/module/$(PKG_LOW)
++
+ # Remove package sources
+ $(BUILD_DIR)/%/.stamp_dircleaned:
+ 	$(if $(BR2_PER_PACKAGE_DIRECTORIES),rm -Rf $(PER_PACKAGE_DIR)/$(NAME))
+ 	rm -Rf $(@D)
+ 
++$(BUILD_DIR)/%/.stamp_pack_module:
++	@$(call MESSAGE,"Pack module")
++	$(foreach hook,$($(PKG)_PRE_PACK_MODULE_HOOKS),$(call $(hook))$(sep))
++	mkdir -p $(TOPDIR)/../output/module/$(PKG)
++	$(if $($(shell echo $(PKG) | tr a-z A-Z)_PACK_MODULE_CMDS),+$($(shell echo $(PKG) | tr a-z A-Z)_PACK_MODULE_CMDS), \
++		@for dir in $(TOPDIR)/../output/per-package/$(PKG)/target/lib/modules/*; \
++		do (mkdir -p $(TOPDIR)/../output/module/$(PKG)/$$(basename $$dir); \
++		cp -rf $$dir/extra/*.ko $(TOPDIR)/../output/module/$(PKG)/$$(basename $$dir)); done)
++	$(foreach hook,$($(PKG)_POST_PACK_MODULE_HOOKS),$(call $(hook))$(sep))
++
+ ################################################################################
+ # virt-provides-single -- check that provider-pkg is the declared provider for
+ # the virtual package virt-pkg
+@@ -839,6 +855,7 @@
+ 	$$($(2)_FINAL_RECURSIVE_RDEPENDENCIES__X))
+ 
+ # define sub-target stamps
++$(2)_AUTO =           			$$($(2)_DIR)/.stamp_auto
+ $(2)_TARGET_INSTALL =           $$($(2)_DIR)/.stamp_installed
+ $(2)_TARGET_INSTALL_TARGET =	$$($(2)_DIR)/.stamp_target_installed
+ $(2)_TARGET_INSTALL_STAGING =	$$($(2)_DIR)/.stamp_staging_installed
+@@ -852,6 +869,8 @@
+ $(2)_TARGET_SOURCE =		$$($(2)_DIR)/.stamp_downloaded
+ $(2)_TARGET_ACTUAL_SOURCE =	$$($(2)_DIR)/.stamp_actual_downloaded
+ $(2)_TARGET_DIRCLEAN =		$$($(2)_DIR)/.stamp_dircleaned
++$(2)_PACK_TARGET_MODULE =	$$($(2)_DIR)/.stamp_pack_module
++$(2)_PACK_CLEAN =			$$($(2)_DIR)/.stamp_pack_clean
+ 
+ # default extract command
+ $(2)_EXTRACT_CMDS ?= \
+@@ -882,6 +901,34 @@
+ $(2)_POST_INSTALL_TARGET_HOOKS += REMOVE_CONFLICTING_USELESS_FILES_IN_TARGET
+ endif
+ 
++$(1)-auto:		$$($(2)_AUTO)
++$$($(2)_AUTO): 	$$($(2)_TARGET_BUILD)
++
++ifeq ($$($(2)_TYPE),host)
++$$($(2)_AUTO): $$($(2)_TARGET_INSTALL_HOST)
++else
++$(2)_AUTO_INSTALL_STAGING	?= NO
++$(2)_AUTO_INSTALL_IMAGES	?= NO
++$(2)_AUTO_INSTALL_TARGET	?= YES
++$(2)_AUTO_INSTALL_TARGET_PACK_MODULE	?= YES
++ifeq ($$($(2)_AUTO_INSTALL_TARGET),YES)
++$$($(2)_AUTO): $$($(2)_TARGET_INSTALL_TARGET)
++endif
++ifeq ($$($(2)_AUTO_INSTALL_STAGING),YES)
++$$($(2)_AUTO): $$($(2)_TARGET_INSTALL_STAGING)
++endif
++ifeq ($$($(2)_AUTO_INSTALL_IMAGES),YES)
++$$($(2)_AUTO): $$($(2)_TARGET_INSTALL_IMAGES)
++endif
++
++
++ifeq ($$($(2)_AUTO_INSTALL_TARGET_PACK_MODULE),YES)
++ifneq ($$($(2)_KERNEL_MODULES_INSTALL),)
++$$($(2)_AUTO): $$($(2)_PACK_TARGET_MODULE)
++endif
++endif
++endif
++
+ # human-friendly targets and target sequencing
+ $(1):			$(1)-install
+ $(1)-install:		$$($(2)_TARGET_INSTALL)
+@@ -893,6 +940,7 @@
+ $(2)_INSTALL_STAGING	?= NO
+ $(2)_INSTALL_IMAGES	?= NO
+ $(2)_INSTALL_TARGET	?= YES
++$(2)_INSTALL_TARGET_PACK_MODULE	?= NO
+ ifeq ($$($(2)_INSTALL_TARGET),YES)
+ $$($(2)_TARGET_INSTALL): $$($(2)_TARGET_INSTALL_TARGET)
+ endif
+@@ -902,6 +950,10 @@
+ ifeq ($$($(2)_INSTALL_IMAGES),YES)
+ $$($(2)_TARGET_INSTALL): $$($(2)_TARGET_INSTALL_IMAGES)
+ endif
++
++ifeq ($$($(2)_INSTALL_TARGET_PACK_MODULE),YES)
++$$($(2)_TARGET_INSTALL): $$($(2)_PACK_TARGET_MODULE)
++endif
+ endif
+ 
+ ifeq ($$($(2)_INSTALL_TARGET),YES)
+@@ -911,6 +963,10 @@
+ $(1)-install-target:
+ endif
+ 
++ifeq ($$($(2)_INSTALL_TARGET),YES)
++$(1)-pack-module: $$($(2)_PACK_TARGET_MODULE)
++endif
++
+ ifeq ($$($(2)_INSTALL_STAGING),YES)
+ $(1)-install-staging:			$$($(2)_TARGET_INSTALL_STAGING)
+ $$($(2)_TARGET_INSTALL_STAGING):	$$($(2)_TARGET_BUILD)
+@@ -1047,6 +1103,8 @@
+ 
+ $(1)-dirclean:		$$($(2)_TARGET_DIRCLEAN)
+ 
++$(1)-pack-clean:		$$($(2)_PACK_CLEAN)
++
+ $(1)-clean-for-reinstall:
+ ifneq ($$($(2)_OVERRIDE_SRCDIR),)
+ 			rm -f $$($(2)_TARGET_RSYNC)
+@@ -1072,6 +1130,7 @@
+ # define the PKG variable for all targets, containing the
+ # uppercase package variable prefix
+ $$($(2)_TARGET_INSTALL):		PKG=$(2)
++$$($(2)_AUTO):					PKG=$(2)
+ $$($(2)_TARGET_INSTALL_TARGET):		PKG=$(2)
+ $$($(2)_TARGET_INSTALL_STAGING):	PKG=$(2)
+ $$($(2)_TARGET_INSTALL_IMAGES):		PKG=$(2)
+@@ -1089,8 +1148,11 @@
+ $$($(2)_TARGET_SOURCE):			PKGDIR=$(pkgdir)
+ $$($(2)_TARGET_ACTUAL_SOURCE):		PKG=$(2)
+ $$($(2)_TARGET_ACTUAL_SOURCE):		PKGDIR=$(pkgdir)
++$$($(2)_PACK_TARGET_MODULE):	PKG=$(1)
+ $$($(2)_TARGET_DIRCLEAN):		PKG=$(2)
+ $$($(2)_TARGET_DIRCLEAN):		NAME=$(1)
++$$($(2)_PACK_CLEAN):			PKG=$(3)
++$$($(2)_PACK_CLEAN):			PKG_LOW=$(1)
+ 
+ # Compute the name of the Kconfig option that correspond to the
+ # package being enabled.
+@@ -1103,8 +1165,21 @@
+ else ifeq ($$($(2)_IS_VIRTUAL),YES)
+ $(2)_KCONFIG_VAR = BR2_PACKAGE_HAS_$(2)
+ else
++
++ifeq ($$(BR2_PACKAGE_$(2)),y)
+ $(2)_KCONFIG_VAR = BR2_PACKAGE_$(2)
+ endif
++ifeq ($$(BR2_PACKAGE_APP_$(2)),y)
++$(2)_KCONFIG_VAR = BR2_PACKAGE_APP_$(2)
++endif
++ifeq ($$(BR2_PACKAGE_DRIVER_$(2)),y)
++$(2)_KCONFIG_VAR = BR2_PACKAGE_DRIVER_$(2)
++endif
++ifeq ($$(BR2_PACKAGE_TOOLS_$(2)),y)
++$(2)_KCONFIG_VAR = BR2_PACKAGE_TOOLS_$(2)
++endif
++
++endif
+ 
+ # legal-info: declare dependencies and set values used later for the manifest
+ ifneq ($$($(2)_LICENSE_FILES),)
+@@ -1290,7 +1365,10 @@
+ 	$(1)-show-depends \
+ 	$(1)-show-info \
+ 	$(1)-show-version \
+-	$(1)-source
++	$(1)-source \
++	$(1)-pack-module \
++	$(1)-auto \
++	$(1)-pack-clean
+ 
+ ifneq ($$($(2)_SOURCE),)
+ ifeq ($$($(2)_SITE),)

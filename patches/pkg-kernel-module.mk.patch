@@ -1,0 +1,59 @@
+--- buildroot-2023.02.3/package/pkg-kernel-module.mk	2023-07-17 21:07:52.000000000 +0000
++++ buildroot-2023.02.3/package/pkg-kernel-module.mk	2023-09-09 08:25:43.715956352 +0000
+@@ -49,8 +49,14 @@
+ LINUX_NEEDS_MODULES = y
+ endif
+ 
++ifeq ($$(BR2_PACKAGE_DRIVER_$(2)),y)
++LINUX_NEEDS_MODULES = y
++endif
++
+ # The kernel must be built first.
++ifeq ($(EXTERNEL_LINUX_DIR),)
+ $(2)_DEPENDENCIES += linux
++endif
+ 
+ # This is only defined in some infrastructures (e.g. autotools, cmake),
+ # but not in others (e.g. generic). So define it here as well.
+@@ -64,10 +70,10 @@
+ # Force PWD for those packages that want to use it to find their
+ # includes and other support files (Booo!)
+ define $(2)_KERNEL_MODULES_BUILD
+-	@$$(call MESSAGE,"Building kernel module(s)")
++	$$(call MESSAGE,"Building kernel module(s)")
+ 	$$(foreach d,$$($(2)_MODULE_SUBDIRS), \
+ 		$$(LINUX_MAKE_ENV) $$($$(PKG)_MAKE) \
+-			-C $$(LINUX_DIR) \
++			-C $$(if $$(EXTERNEL_LINUX_DIR),$$(EXTERNEL_LINUX_DIR),$$(LINUX_DIR)) \
+ 			$$(LINUX_MAKE_FLAGS) \
+ 			$$($(2)_MODULE_MAKE_OPTS) \
+ 			PWD=$$(@D)/$$(d) \
+@@ -80,10 +86,10 @@
+ # Force PWD for those packages that want to use it to find their
+ # includes and other support files (Booo!)
+ define $(2)_KERNEL_MODULES_INSTALL
+-	@$$(call MESSAGE,"Installing kernel module(s)")
++	$$(call MESSAGE,"Installing kernel module(s)")
+ 	$$(foreach d,$$($(2)_MODULE_SUBDIRS), \
+ 		$$(LINUX_MAKE_ENV) $$($$(PKG)_MAKE) \
+-			-C $$(LINUX_DIR) \
++			-C $$(if $$(EXTERNEL_LINUX_DIR),$$(EXTERNEL_LINUX_DIR),$$(LINUX_DIR)) \
+ 			$$(LINUX_MAKE_FLAGS) \
+ 			$$($(2)_MODULE_MAKE_OPTS) \
+ 			PWD=$$(@D)/$$(d) \
+@@ -92,6 +98,15 @@
+ endef
+ $(2)_POST_INSTALL_TARGET_HOOKS += $(2)_KERNEL_MODULES_INSTALL
+ 
++ifndef $(2)_PACK_MODULE_CMDS
++define $(2)_PACK_MODULE_CMDS
++	$$(foreach d,$$(shell ls -d $(TOPDIR)/../output/per-package/$$(PKG)/target/lib/modules/*), \
++		mkdir -p $(TOPDIR)/../output/module/$$(PKG)/$$(shell basename $$(d)); \
++		cp -rf $$(d)/extra/*.ko $(TOPDIR)/../output/module/$$(PKG)/$$(shell basename $$(d)); \
++	)
++endef
++endif
++
+ endef
+ 
+ ################################################################################

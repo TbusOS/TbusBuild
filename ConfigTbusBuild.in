@@ -1,0 +1,20 @@
+mainmenu "TbusBuild Configuration"
+
+config BUILD_ROOT_VERSION
+	string "build root version"
+	default "2023.02.3"
+
+menu "select platform"
+	config APP_PLATFORM
+		bool "app"
+		default y
+
+	config DRIVER_PLATFORM
+		bool "driver"
+		default y
+
+	config TOOLS_PLATFORM
+		bool "tools"
+		default y
+
+endmenu

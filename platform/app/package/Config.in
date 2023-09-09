@@ -1,0 +1,4 @@
+config BR2_SELECT_ALL_APP
+    bool "select all app"
+    default n
+    select BR2_PACKAGE_APP_DEMO

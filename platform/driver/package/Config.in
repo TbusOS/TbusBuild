@@ -1,0 +1,4 @@
+config BR2_SELECT_ALL_DRIVER
+    bool "select all driver"
+    default n
+    select BR2_PACKAGE_DRIVER_HELLO_WORLD
